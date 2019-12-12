@@ -1,0 +1,399 @@
+<!DOCTYPE HTML>
+<html>
+   <head>
+      <title>Doctor Dashboard</title>
+      <link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Open+Sans" />
+      <link rel="stylesheet" href="css/bootstrap.css"/>
+      <link rel="stylesheet" href="bootflat/css/bootflat.css"/>
+       <!-- Load AngularJS -->
+      <script src="http://static.opentok.com/v2/js/opentok.min.js"></script>
+<!--      <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.4.8/angular.min.js"></script> -->
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.5.10/angular.min.js" data-semver="1.5.10" data-require="angular.js@1.5.x"></script>
+	<script src="bootstrap-gh-pages/ui-bootstrap-tpls-2.4.0.js"></script>
+	<script src="js/angular-disable-all.min.js"></script> 
+      <script type="text/javascript">
+         
+
+var msgHistory = document.querySelector('#history');
+
+         var app = angular.module("VC", ['ui.bootstrap','disableAll']);
+              var session;  
+         app.controller("VCController",function ($scope, $sce, $http,$window,$timeout){
+
+          var t = $scope;
+             $scope.form = {
+ msgTxt: ""
+                };
+
+          t.input = 'Line 1<br/>Line 2<br/>Line 3';
+
+          var trusted = {};
+    t.doctorname = '';
+    t.patientname = '';
+      t.btnLabel = [];
+      t.patients = [];
+   
+          t.getPopoverContent = function(content) {
+  return trusted[content] || (trusted[content] = $sce.trustAsHtml(content)); 
+}
+         t.startVideo = function(){
+          
+              $http.get("http://172.18.0.3:8080/doctors/keys/"+$window.sessionStorage.getItem("docId")).then(function(data){
+                 data = data.data[0];
+                 var apiKey = data.apiKey,
+                     sessionId = data.sessionId,
+                     secret = data.secret,
+                     token = data.token;
+                 session = OT.initSession(apiKey, sessionId).on('streamCreated', function(event) {
+                     session.subscribe(event.stream,'patientBox',{});
+                 }).connect(token, function(error) {
+                    var  publisher = OT.initPublisher('videoBox',{});
+                       session.publish(publisher);
+      publisher.on("streamDestroyed", function (event) {
+//  event.preventDefault();
+// dCode to go  here 
+// for a) what to do when doctor ends the call  .  event.reason = clientDisconnected
+// b) what to do when doctor session is timed out due to any reason event.reason = networkTimedout
+  if(event.reason == 'clientDisconnected')
+  {
+
+  }
+  
+  if(event.reason == 'networkTimedout')
+  {
+  
+  }
+  
+}); 
+                 });
+
+
+         // Receive a message and append it to the history
+  
+  session.on('signal:msg', function(event) {
+    var msg = document.createElement('p');
+    msg.innerHTML = event.data;
+   if(event.from.connectionId === session.connection.connectionId)
+    {
+        msg.innerHTML = t.doctorname + " :"+ event.data;
+    } 
+    else
+    {
+        msg.innerHTML = t.patientname + " :" + event.data;
+    }
+    msg.className = event.from.connectionId === session.connection.connectionId ? 'mine' : 'theirs';
+   document.getElementById('history').insertBefore(msg,  document.getElementById('history').firstChild); // Appending at the top
+    msg.scrollIntoView();
+  });
+
+session.on("streamDestroyed", function(event) {
+// Code to go here
+// for what to do when a patient ends the call
+// or
+// when a patient kills the app
+// or
+// when network connection is dropped at patient end event.reason = clientDisconnected
+  
+
+    console.log("Stream " + event.stream.name + " ended. " + event.reason);
+});
+
+session.on("sessionDisconnected", function (event) {
+  // The event is defined by the SessionDisconnectEvent class
+  console.log(event);
+  if (event.reason == "networkDisconnected") {
+    alert("Your network connection terminated.")
+  }
+});
+
+
+
+        
+
+
+
+             }); 
+         };
+        
+
+ 
+              t.endVideo = function(appointmentId) {
+     session.disconnect();
+  
+     if(document.getElementById('history').innerHTML.length == 0 )
+    {
+      data = {
+            appointmentId : appointmentId,
+            chatText : '', // Blank text
+            chatStatus : 44
+        };
+      config =   { headers : {
+                             'Content-Type' : 'application/json'
+                        }
+                      }; 
+
+        $http.post('http://172.18.0.3:8080/doctors/endconsultation',
+              angular.toJson(data) ,
+              config)
+                    .success(function(data,status,headers,config) {})
+                     .error(function(data,status,headers,config) {});
+
+        
+
+    }
+    else
+    {
+      alert('Saving textchat');
+      data = {
+            appointmentId : appointmentId,
+            chatText : document.getElementById('history').innerHTML,
+            chatStatus : 44
+        };
+      config =   { headers : {
+                             'Content-Type' : 'application/json'
+                        }
+                      }; 
+
+        $http.post('http://172.18.0.3:8080/doctors/endconsultation',
+              angular.toJson(data) ,
+              config)
+                    .success(function(data,status,headers,config) {})
+                     .error(function(data,status,headers,config) {});
+
+        
+                     document.getElementById('history').innerHTML = "";
+
+    }
+
+          t.getPatients();             
+
+         };
+         
+
+  
+  t.$watch('patients', function (newValues, oldValues) {
+    for (var i = 0; i < newValues.length; i++) {
+      //console.log(newValues[i].chatStatus);
+      if (newValues[i].chatStatus != 22) {
+        t.btnLabel[i] = 'In Progress';
+      }
+    }
+  }, true);
+
+         t.getPatients = function() {
+         $http.get('http://172.18.0.3:8080/doctors/patientlist/'+ $window.sessionStorage.getItem("docId")).then(function(data){
+         t.patients = data.data;
+         for (var i = 0; i < t.patients.length; i++) {
+      if (t.patients[i].chatStatus != 22) {
+        t.btnLabel[i] = 'In Progress';
+      }
+    }
+         
+   $timeout(t.getPatients, 30000);           
+         });  
+         
+         }; 
+         
+ t.getDoctor = function() {
+         $http.get('http://172.18.0.3:8080/doctors/detailsd/'+ $window.sessionStorage.getItem("docId")).then(function(data){
+         t.doctorname = data.data.name;    
+    //     $timeout(t.getPatients, 30000);           
+         });  
+         
+         }; 
+         t.chatNow = function(patientId) {
+    //console.log(document.getElementById('patientBox').childNodes.length);
+    if(document.getElementById('patientBox').childNodes.length > 1)
+    {
+      alert('Session Already in progress');
+      return false;
+    }
+$http.get('http://172.18.0.3:8080/patients/detailsp/'+ patientId).then(function(data){
+         t.patientname = data.data.name;    
+         });
+    
+    t.btnLabel[t.patients.indexOf($scope.patients.find(x => x.id == patientId))] = 'In Progress';
+
+/*
+         data = {
+                  patientId: patientId,
+                  doctorId:  $window.sessionStorage.getItem("docId") 
+            };
+         config =   { headers : {
+                             'Content-Type' : 'application/json'
+                        }
+                      };          
+          $http.post('http://172.18.0.3:8080/doctors/startchat',
+              angular.toJson(data) ,
+              config)
+                    .success(function(data,status,headers,config) {})
+                     .error(function(data,status,headers,config) {});
+*/
+   
+            };    
+         
+         t.activate = function(tt)
+   {
+    //t.toggleState = tt;
+
+         if(tt == 'Away')
+     {
+
+
+      data = {
+                  status: "Away",
+                  id:  $window.sessionStorage.getItem("docId") 
+            };
+         config =   { headers : {
+                             'Content-Type' : 'application/json'
+                        }
+                      };          
+          $http.post('http://172.18.0.3:8080/doctors/updateDoctor',
+              angular.toJson(data) ,
+              config)
+                    .success(function(data,status,headers,config) {})
+                     .error(function(data,status,headers,config) {});
+      
+
+
+     }
+
+    else
+                 {
+
+                            data = {
+                  status: "Available",
+                  id:  $window.sessionStorage.getItem("docId") 
+            };
+         config =   { headers : {
+                             'Content-Type' : 'application/json'
+                        }
+                      };          
+          $http.post('http://172.18.0.3:8080/doctors/updateDoctor',
+              angular.toJson(data) ,
+              config)
+                    .success(function(data,status,headers,config) {})
+                     .error(function(data,status,headers,config) {});
+      
+
+                        
+                 }
+
+
+   }; 
+  
+         t.boost = function()
+         {
+         $http.get('http://172.18.0.3:8080/doctors/logout/'+ $window.sessionStorage.getItem("docId")).then(function(data){
+          
+                  $window.location.href="index.html";    
+         
+           
+         });          
+         }    
+    
+
+         t.pushMe = function()
+          {
+              
+                session.signal({
+               type: 'msg',
+               data: document.getElementById('abc').value
+    }, function(error) {
+      if (!error) {
+        document.getElementById('abc').value = '';
+      }
+    });            
+          } 
+
+
+          t.tisco = function()
+        {
+                for (var i = 0; i < t.patients.length; i++) {
+       if (t.patients[i].chatStatus != 22) {
+        t.btnLabel[i] = 'In Progress';
+       }
+      else
+      {
+        t.btnLabel[i] = 'Start Consultation';
+      }
+    }
+        };  
+
+         $window.onbeforeunload =  t.onExit;
+         //};
+   t.getDoctor();
+         t.startVideo();
+         t.getPatients();
+
+         });
+
+  
+
+ 
+         
+         
+         
+      </script>
+      <style>
+      .popover {
+    max-width: 800px; /* optional max width */
+    width: intrinsic; /* Safari/WebKit uses a non-standard name */
+    width: -moz-max-content; /* Firefox/Gecko */
+    width: -webkit-max-content; /* Chrome */
+}
+
+  .mine {
+    background-color: #80deea
+  }
+
+  .theirs {
+    background-color: #dcedc8
+  }
+      </style>
+   </head>
+     <body ng-app="VC" ng-controller="VCController" >
+      <div style="text-align: center">
+         <h3 style="font-weight:400">
+         vHospital {{doctorname}}&apos;s Room</h1>
+</div>
+  <div>
+    <input type="radio" style="height:35px; width:35px;border:0" ng-checked="true" ng-model="toggleState" value="Available"  ng-change="activate('Available')">&nbsp;<strong style="font-size:30px;">Available</strong> <span style="font-size:20px">(Patient can see you on mobile)</span> 
+    &nbsp;&nbsp;&nbsp;&nbsp;<input type="radio" style="height:35px; width:35px;border:0" ng-model="toggleState" value="Away" ng-change="activate('Away')" >&nbsp;<strong style="font-size:30px">Away</strong><span style="font-size:20px"> (No more patient would be added to your queue)</span>    
+            <span style="float:right;margin-right:100px"><button class="btn  btn-danger" style="text-align:middle;margin-top:0px;position:absolute" ng-click="boost()">Logout</button></span>
+         <br/>
+
+      </div>
+  <p/>
+  <p/>
+      <div class="container">
+         <div id="videoDiv"  class="col-md-12">
+          <div  class="col-md-4">
+      <div id="videoBox">
+      </div>
+      <div id="patientBox">
+      </div>
+          </div>
+            <div id="textchat" class="col-md-4">
+            <form  ng-submit="pushMe()">
+                 <input type="text" ng-model="form.msgTxt"  id="abc" maxlength="100" size="40"  placeholder="Enter your text here"></input>
+            </form>
+      <p/>
+                <div id="history"></div>
+      </div>
+    
+           <div class="col-md-4">
+            <span><strong>Patient List</strong></span>
+               <div class="list-group" ng-repeat="patient in patients" style="width:320px" disable-all="!$first">
+                    <a href="#" class="list-group-item"   ng-click="chatNow(patient.id);" 
+               >{{patient.firstName}} {{patient.lastName}}</a> &nbsp;
+          
+    <button ng-init="tisco()" class="btn btn-success" ng-click="chatNow(patient.id);">{{btnLabel[$index]}}</button> &nbsp;
+    <button class="btn btn-danger" ng-click="endVideo(patient.appointmentId);">End Consultation</button>
+                </div> <!-- list-group ends -->
+          </div>
+         
+        </div>
+  </div> <!--Container -->
+  </body> 
+</html>

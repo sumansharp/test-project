@@ -1,0 +1,231 @@
+<!DOCTYPE HTML>
+<html>
+   <head>
+      <title>Doctor Dashboard</title>
+      <link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Open+Sans" />
+      <link rel="stylesheet" href="css/bootstrap.css"/>
+      <link rel="stylesheet" href="bootflat/css/bootflat.css"/>
+      <!-- Load AngularJS -->
+      <script src="http://static.opentok.com/v2/js/opentok.min.js"></script>
+      <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.4.8/angular.min.js"></script>
+      <script src="bootstrap-gh-pages/ui-bootstrap-tpls-2.4.0.js"></script>
+      <script type="text/javascript">
+         
+
+var msgHistory = document.querySelector('#history');
+//var form = document.querySelector('#textChatForm');
+//var msgTxt = document.querySelector('#msgTxt');
+
+         var app = angular.module("VC", ['ui.bootstrap']);
+              var session;  
+
+         app.controller("VCController",function ($scope, $sce, $http,$window){
+
+          
+           
+
+ 
+          var t = $scope;
+          
+            $scope.form = {
+ msgTxt: ""
+                };
+
+          t.input = 'Line 1<br/>Line 2<br/>Line 3';
+
+          var trusted = {};
+
+
+
+          t.getPopoverContent = function(content) {
+  return trusted[content] || (trusted[content] = $sce.trustAsHtml(content)); 
+}
+         t.startVideo = function(){
+          
+              $http.get("http://172.18.0.3:8080/doctors/keys/"+$window.sessionStorage.getItem("docId")).then(function(data){
+                 data = data.data[0];
+                 var apiKey = data.apiKey,
+                     sessionId = data.sessionId,
+                     secret = data.secret,
+                     token = data.token;
+         
+                 session = OT.initSession(apiKey, sessionId).on('streamCreated', function(event) {
+                     session.subscribe(event.stream,'patientBox',{});
+                 }).connect(token, function(error) {
+                     var publisher = OT.initPublisher('',{});
+                       session.publish(publisher);
+                 });
+
+
+         // Receive a message and append it to the history
+  
+  session.on('signal:msg', function(event) {
+    var msg = document.createElement('p');
+    msg.innerHTML = event.data;
+    msg.className = event.from.connectionId === session.connection.connectionId ? 'mine' : 'theirs';
+    document.getElementById('history').appendChild(msg);
+    msg.scrollIntoView();
+  });
+
+
+// Text chat
+
+// Send a signal once the user enters data in the form
+/*
+form.addEventListener('submit', function(event) {
+  event.preventDefault();
+
+
+});
+*/
+
+
+        
+
+
+
+             }); 
+         };
+        
+
+              t.endVideo = function() {
+                session.disconnect();
+         };
+         
+         t.getPatients = function() {
+         $http.get('http://172.18.0.3:8080/doctors/patientlist/'+ $window.sessionStorage.getItem("docId")).then(function(data){
+         t.patients = data.data;    
+           
+         });  
+         
+         }; 
+         
+         t.chatNow = function(patientId) {
+         data = {
+                  patientId: patientId,
+                  doctorId:  $window.sessionStorage.getItem("docId") 
+            };
+         config =   { headers : {
+                             'Content-Type' : 'application/json'
+                        }
+                      };          
+          $http.post('http://172.18.0.3:8080/doctors/startchat',
+              angular.toJson(data) ,
+              config)
+                    .success(function(data,status,headers,config) {})
+                     .error(function(data,status,headers,config) {})
+            };    
+         
+         
+         t.boost = function()
+         {
+         $http.get('http://172.18.0.3:8080/doctors/logout/'+ $window.sessionStorage.getItem("docId")).then(function(data){
+          
+                  $window.location.href="index.html";    
+         
+           
+         });          
+         }    
+    
+
+         t.pushMe = function()
+          {
+              
+                session.signal({
+               type: 'msg',
+               data: document.getElementById('abc').value
+    }, function(error) {
+      if (!error) {
+        document.getElementById('abc').value = '';
+      }
+    });            
+          } 
+
+
+
+
+
+
+
+
+         $window.onbeforeunload =  t.onExit;
+         //};
+         t.startVideo();
+         t.getPatients();
+
+         });
+
+ 
+         
+         
+         
+      </script>
+      <style>
+      .popover {
+    max-width: 800px; /* optional max width */
+    width: intrinsic; /* Safari/WebKit uses a non-standard name */
+    width: -moz-max-content; /* Firefox/Gecko */
+    width: -webkit-max-content; /* Chrome */
+}
+      </style>
+   </head>
+     <body ng-app="VC" ng-controller="VCController" style="margin:20px">
+      <div style="text-align: center">
+         <h3 style="font-weight:400">
+         vHospital Doctor&apos;s Dashboard/Lounge</h1>
+         <div style="text-align:right">
+            <button class="btn  btn-link" ng-click="boost()">Logout</button>
+ <!--<label class="toggle">
+            <input checked="checked" type="checkbox" ng-click="boost();">
+            <span class="handle" ></span>ON 
+            </label>       -->
+         </div>
+         <br/>
+      </div>
+      <div class="container">
+         <div id="videoDiv"  class="col-md-12">
+            <div class="col-md-4">
+               <button class="btn btn-danger"  ng-click="endVideo();">End Consultation</button>
+               <br/>
+            </div>
+            <!--<button class="btn btn-danger btn-block" ng-click="endVideo();">End Video</button>-->
+         </div>
+         <div id="videoBox" class="col-md-4">
+         </div>
+          <div id="textchat" CLASS="col-md-4">
+         <p id="history"></p>
+         <form  ng-submit="pushMe()">
+              <input type="text" ng-model="form.msgTxt"  id="abc" placeholder="Enter your text here"></input>
+         </form>
+    </div>
+    
+         <div class="col-md-2">
+<!--<a href="#" class="list-group-item active">Patient List</a> -->
+      <span><strong>Patient List</strong></span>
+            <div class="list-group" ng-repeat="patient in patients" >
+                <a href="#" class="list-group-item"  popover-trigger="'mouseenter'"  popover-placement="right"  ng-click="chatNow(patient.id);" 
+                <!-- uib-popover-html="getPopoverContent('<div>
+               <span> Patient Name : {{patient.firstname}} {{patient.lastname}} </span>
+               <br/>
+               <span> Date of Birth : {{patient.dateofbirth}} </span>
+               <br/>
+               Gender :<strong>{{patient.gender}}</strong>'); -->" >{{patient.firstname}} {{patient.lastname}}</a>
+            </div>
+         </div>
+         
+        </div>" "
+         <!-- <div id="QueuedPatients" class="col-md-6" ng-repeat="patient in patients">
+            <div>
+               <span> Patient Name : {{patient.firstname}} {{patient.lastname}} </span>
+               <br/>
+               <span> Date of Birth : {{patient.dateofbirth}} </span>
+               <br/>
+               Gender :<strong>{{patient.gender}}</strong>
+               <br/>
+               <button class="btn btn-danger" ng-click="chatNow(patient.id);">Chat </button>
+            </div>
+         </div> -->
+      </div>
+   </body>
+</html>
+

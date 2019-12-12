@@ -1,0 +1,139 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>
+            vHospital - Doctor Portal
+        </title>
+<link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Open+Sans" />
+    
+    <link rel="stylesheet" href="css/bootstrap.css"/>
+     <link rel="stylesheet" href="bootflat/css/bootflat.css"/>
+
+        <!-- Load AngularJS -->
+
+        <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.4.8/angular.min.js"></script>
+        
+        
+
+        <script type="text/javascript">
+            var app = angular.module("UserManagement", []);
+         
+            //Controller Part
+            app.controller("UserManagementController", function($scope, $http,$location,$window) {
+         
+                //Initialize page with default data which is blank in this example
+                $scope.employees = [];
+                $scope.form = {
+ email: "",
+ password: ""
+                };
+         
+                //HTTP POST/PUT methods for add/edit employee
+                $scope.submitEmployee = function() {
+         
+                        method = 'POST';
+                        url = 'http://localhost:8080/doctors/login';
+ 
+                    $http({
+                        method : method,
+                        url : url,
+                        data : angular.toJson($scope.form),
+                        headers : {
+                            'Content-Type' : 'application/json'
+                        }
+                    }).then( _success, _error );
+                };
+         
+                
+                
+         
+                function _success(response) {
+                    //console.log(response.data.notifier);
+                    console.log(response.data);
+                    if(response.data.notifier == "Invalid User")
+                    {
+                         document.getElementById('msgDiv').innerHTML = "<strong>Invalid Credentials</strong>";
+                         return false;
+
+                    }
+
+                    if(response.data.notifier == "Already Logged In")
+                    {
+                        alert('Clearing your previous session');
+
+                        //document.getElementById('msgDiv').innerHTML = "<strong>Already Logged In</strong>";
+                         //return false;
+
+                          method = 'POST';
+                        url = 'http://localhost:8080/doctors/login2';
+ 
+                    $http({
+                        method : method,
+                        url : url,
+                        data : angular.toJson($scope.form),
+                        headers : {
+                            'Content-Type' : 'application/json'
+                        }
+                    }).then( _success, _error );
+    
+                    }
+
+                    if(response.data.notifier != 'Invalid User' &&  response.data.notifier != 'Already Logged In')                    
+                     {
+                        $window.sessionStorage.setItem("docId",response.data.notifier);   
+                        $window.location.href="videochat2.html";
+                     }
+                    
+                 }
+         
+                function _error(response) {
+                    console.log(response);
+                }
+         
+                      });
+        </script>
+       
+    <head>
+    <body ng-app="UserManagement" ng-controller="UserManagementController">
+         <h2 style="font-weight: 400;text-align:center">
+            vHospital - Doctor Login
+        </h1>
+ 
+     
+        
+        <form ng-submit="submitEmployee()">
+            
+            <div class="col-md-12">
+                <div class="col-md-4">
+                </div>
+                <div class="col-md-4">
+                    <div class="row" style="margin-bottom: 30px;margin-top: 30px">
+                        <div class="col-md-6" >
+                            <input class="form-control" type="text" ng-model="form.email" placeholder="Username" size="30" required="required">  
+                        </div>
+                    </div>
+    
+                    <div class="row" style="margin-bottom: 30px">
+                        <div class="col-md-6">
+                            <input class="form-control" type="password" ng-model="form.password" placeholder="Password" size="30" required="required">  
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                                <button type="submit" class="btn btn-primary btn-block">Submit</button>  
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6" id="msgDiv">
+                                   
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+ 
+    </body>
+</html>
